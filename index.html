@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>溜冰者扔球 · 动量守恒模拟</title>
+<style>
+  :root {
+    --bg-1: #f5f9ff;
+    --bg-2: #e7f0fa;
+    --card: #ffffff;
+    --line: #dbe6f2;
+    --ink: #1e3a5f;
+    --ink-soft: #5a7290;
+    --accent: #2a6f97;
+    --accent-soft: #eaf3fb;
+    --color-a: #e63946;
+    --color-b: #2a6f97;
+    --color-ball: #e09a3e;
+    --green: #2e9e6b;
+    --radius: 14px;
+    --shadow: 0 6px 20px rgba(40, 80, 120, 0.10);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    color: var(--ink);
+    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    min-height: 100vh;
+    padding: 28px 22px;
+  }
+
+  .wrap { max-width: 1220px; margin: 0 auto; }
+
+  header { margin-bottom: 18px; }
+
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  header p b { color: var(--ink); }
+
+  main {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .canvas-col {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    background: #fff;
+  }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 4px 2px;
+  }
+
+  .legend .dot {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+
+  /* ===== 右侧公式面板 ===== */
+  #formula-panel {
+    flex: 1 1 360px;
+    min-width: 340px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 18px 20px;
+  }
+
+  #formula-panel h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .params {
+    background: var(--accent-soft);
+    border: 1px solid #d3e6f5;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #33516e;
+    margin-bottom: 14px;
+    line-height: 1.7;
+  }
+
+  .params b { color: var(--accent); }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .stat {
+    background: #f7fafd;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 8px 10px;
+  }
+
+  .stat label {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+    letter-spacing: 0.3px;
+  }
+
+  .stat span {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #phase-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .phase-card {
+    border: 1px solid var(--line);
+    border-left: 4px solid #b9c6d4;
+    border-radius: 10px;
+    padding: 11px 13px;
+    background: #fbfcfe;
+    transition: all 0.25s ease;
+  }
+
+  .phase-card.active {
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 2px 10px rgba(42, 111, 151, 0.12);
+  }
+
+  .phase-card.done {
+    border-left-color: var(--green);
+  }
+
+  .phase-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+
+  .phase-num { font-weight: 700; color: var(--accent); }
+
+  .phase-title { font-weight: 600; font-size: 14px; flex: 1; }
+
+  .phase-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .phase-card.active .phase-badge { background: var(--accent); color: #fff; }
+  .phase-card.done  .phase-badge { background: #e3f4ec; color: var(--green); }
+
+  .formula {
+    font-family: "Cambria Math", "Times New Roman", Georgia, serif;
+    font-size: 14px;
+    padding: 2px 0;
+    color: #24435f;
+  }
+
+  .result {
+    margin-top: 7px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    border-top: 1px dashed var(--line);
+    padding-top: 6px;
+  }
+
+  .result b { color: var(--ink); }
+
+  /* ===== 控制按钮 ===== */
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+  }
+
+  .controls button {
+    font-size: 15px;
+    font-weight: 600;
+    padding: 11px 26px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.06s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+
+  #startBtn {
+    background: linear-gradient(135deg, #2a8fd0, #2a6f97);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(42, 111, 151, 0.35);
+  }
+
+  #resetBtn {
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .controls button:hover:not(:disabled) { transform: translateY(-1px); }
+  .controls button:active:not(:disabled) { transform: translateY(0); }
+  .controls button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  @media (max-width: 940px) {
+    main { flex-direction: column; }
+    #formula-panel { width: 100%; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>⛸ 溜冰者扔球 · 动量守恒模拟</h1>
+    <p>
+      已知参数：溜冰者质量 <b>m<sub>A</sub> = m<sub>B</sub> = 70 kg</b>，木球质量 <b>m = 10 kg</b>，
+      相对出手速度 <b>Δv = 5 m/s</b>，初始相距 <b>10 m</b>（A 在 −5，B 在 +5）。
+      在光滑冰面上，A 与 B 依次“扔球 / 接球”，通过动量守恒改变各自速度。
+    </p>
+  </header>
+
+  <main>
+    <!-- 左：动画画布 -->
+    <section class="canvas-col">
+      <canvas id="simCanvas" width="800" height="600"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--color-a)"></span>溜冰者 A（70 kg）</span>
+        <span><span class="dot" style="background:var(--color-b)"></span>溜冰者 B（70 kg）</span>
+        <span><span class="dot" style="background:var(--color-ball)"></span>木球（10 kg）</span>
+        <span>→ 速度矢量箭头</span>
+      </div>
+    </section>
+
+    <!-- 右：公式与物理状态面板 -->
+    <aside id="formula-panel">
+      <h2>📐 碰撞公式与物理状态</h2>
+
+      <div class="params">
+        m<sub>A</sub> = 70 kg&nbsp;&nbsp;·&nbsp;&nbsp;m<sub>B</sub> = 70 kg&nbsp;&nbsp;·&nbsp;&nbsp;m = 10 kg<br>
+        Δv = 5 m/s&nbsp;&nbsp;·&nbsp;&nbsp;初始距离 10 m&nbsp;&nbsp;·&nbsp;&nbsp;A 在 −5，B 在 +5
+      </div>
+
+      <div class="status-grid">
+        <div class="stat"><label>时间 t</label><span id="st-time">0.00 s</span></div>
+        <div class="stat"><label>当前阶段</label><span id="st-phase">未开始</span></div>
+        <div class="stat"><label>球的位置</label><span id="st-ball">A 手中</span></div>
+        <div class="stat"><label>x_A</label><span id="st-xa">−5.00 m</span></div>
+        <div class="stat"><label>x_B</label><span id="st-xb">5.00 m</span></div>
+        <div class="stat"><label>x_球</label><span id="st-xball">−5.00 m</span></div>
+        <div class="stat"><label>v_A</label><span id="st-va">0.00 m/s</span></div>
+        <div class="stat"><label>v_B</label><span id="st-vb">0.00 m/s</span></div>
+        <div class="stat"><label>v_球</label><span id="st-vball">0.00 m/s</span></div>
+      </div>
+
+      <div id="phase-list"></div>
+    </aside>
+  </main>
+
+  <div class="controls">
+    <button id="startBtn">▶ 开始模拟</button>
+    <button id="resetBtn">↺ 重置</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+   * 已知参数
+   * ============================================================ */
+  const m_A = 70;      // 溜冰者 A 的质量 (kg)
+  const m_B = 70;      // 溜冰者 B 的质量 (kg)
+  const m   = 10;      // 木球质量 (kg)
+  const dv  = 5;       // 初始相对出手速度 Δv (m/s)
+
+  /* ============================================================
+   * 三阶段动量守恒公式（对应代码见 throwFromA / catchByB / throwFromB）
+   *
+   * 阶段一 · A 扔球给 B（球相对 A 以 Δv 向前抛出）：
+   *   v_A1 = v_A0 - (m * dv) / (m_A + m)
+   *   v_1  = v_A0 + (m_A * dv) / (m_A + m)
+   *
+   * 阶段二 · B 接住球（B 与球粘合，动量守恒）：
+   *   v_B1 = (m_B * v_B0 + m * v_1) / (m_B + m)
+   *
+   * 阶段三 · B 扔球给 A（球相对 B 以 Δv 向后抛出）：
+   *   v_B2 = v_B1 + (m * dv) / (m_B + m)
+   *   v_2  = v_B1 - (m_B * dv) / (m_B + m)
+   *
+   * （补充收尾）A 接住球，回到初始持有状态：
+   *   v_A2 = (m_A * v_A1 + m * v_2) / (m_A + m)
+   * ============================================================ */
+
+  /* ============================================================
+   * Canvas 与坐标映射
+   * ============================================================ */
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const SCALE = 25;            // 每米对应像素数
+  const OX = W / 2;            // 世界坐标 x = 0 在画布上的横坐标
+  const OY = H * 0.55;         // 滑行线所在高度
+  const TIMESCALE = 1.5;       // 播放倍率（物理时间加速，便于演示）
+  const HOLD_TIME = 0.9;       // B 接球后持球时间（物理秒）
+
+  const COLOR_A    = '#e63946';
+  const COLOR_B    = '#2a6f97';
+  const COLOR_BALL = '#e09a3e';
+
+  function toX(wx) { return OX + wx * SCALE; }   // 世界 x -> 画布 x
+
+  /* ============================================================
+   * 状态对象 S（reset 时重建）
+   * ============================================================ */
+  let S = null;
+
+  const PHASE_NAMES = {
+    idle:   '未开始',
+    aThrow: 'A 扔球给 B',
+    bHold:  'B 接住球',
+    bThrow: 'B 扔球给 A',
+    done:   'A 接住球（结束）',
+  };
+
+  /* ============================================================
+   * 阶段展示数据（公式 + 实时数值）
+   * ============================================================ */
+  const PHASES = [
+    {
+      id: 'aThrow', num: '①', title: 'A 扔球给 B',
+      formulas: [
+        'v<sub>A1</sub> = v<sub>A0</sub> − (m·Δv) / (m<sub>A</sub> + m)',
+        'v<sub>1</sub> = v<sub>A0</sub> + (m<sub>A</sub>·Δv) / (m<sub>A</sub> + m)',
+      ],
+      done: () => S.vBall1 !== null,
+      result: () => S.vBall1 === null ? '等待计算…' :
+        'v<sub>A0</sub> = ' + vfmt(S.vA0) + '　→　<b>v<sub>A1</sub> = ' + vfmt(S.vA1) + '</b><br>' +
+        'v<sub>1</sub> = ' + vfmt(S.vBall1),
+    },
+    {
+      id: 'bCatch', num: '②', title: 'B 接住球',
+      formulas: [
+        'v<sub>B1</sub> = (m<sub>B</sub>·v<sub>B0</sub> + m·v<sub>1</sub>) / (m<sub>B</sub> + m)',
+      ],
+      done: () => S.vB1 !== null,
+      result: () => S.vB1 === null ? '等待计算…' :
+        'v<sub>B0</sub> = ' + vfmt(S.vB0) + '，v<sub>1</sub> = ' + vfmt(S.vBall1) +
+        '　→　<b>v<sub>B1</sub> = ' + vfmt(S.vB1) + '</b>',
+    },
+    {
+      id: 'bThrow', num: '③', title: 'B 扔球给 A',
+      formulas: [
+        'v<sub>B2</sub> = v<sub>B1</sub> + (m·Δv) / (m<sub>B</sub> + m)',
+        'v<sub>2</sub> = v<sub>B1</sub> − (m<sub>B</sub>·Δv) / (m<sub>B</sub> + m)',
+      ],
+      done: () => S.vBall2 !== null,
+      result: () => S.vBall2 === null ? '等待计算…' :
+        'v<sub>B1</sub> = ' + vfmt(S.vB1) + '　→　<b>v<sub>B2</sub> = ' + vfmt(S.vB2) + '</b><br>' +
+        'v<sub>2</sub> = ' + vfmt(S.vBall2),
+    },
+    {
+      id: 'aCatch', num: '④', title: 'A 接住球（结束）',
+      formulas: [
+        'v<sub>A2</sub> = (m<sub>A</sub>·v<sub>A1</sub> + m·v<sub>2</sub>) / (m<sub>A</sub> + m)',
+      ],
+      done: () => S.vA2 !== null,
+      result: () => S.vA2 === null ? '等待计算…' :
+        'v<sub>A1</sub> = ' + vfmt(S.vA1) + '，v<sub>2</sub> = ' + vfmt(S.vBall2) +
+        '　→　<b>v<sub>A2</sub> = ' + vfmt(S.vA2) + '</b>',
+    },
+  ];
+
+  /* ============================================================
+   * 工具函数
+   * ============================================================ */
+  function vfmt(v) {               // 速度：带符号
+    if (v === null || v === undefined) return '—';
+    return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2) + ' m/s';
+  }
+  function xfmt(v) {               // 位置
+    if (v === null || v === undefined) return '—';
+    return v.toFixed(2) + ' m';
+  }
+
+  function currentPhaseId() {
+    switch (S.phase) {
+      case 'aThrow': return 'aThrow';
+      case 'bHold':  return 'bCatch';
+      case 'bThrow': return 'bThrow';
+      case 'done':   return 'aCatch';
+      default:       return null;
+    }
+  }
+
+  /* ============================================================
+   * 各阶段动量守恒计算（公式见文件顶部注释）
+   * ============================================================ */
+  function addArrow(wx, vx, color, label, above) {
+    S.arrows.push({ wx: wx, vx: vx, color: color, label: label, above: above, ttl: 1.6 });
+  }
+
+  function throwFromA() {
+    // 阶段一：v_A1 = v_A0 - (m*dv)/(m_A+m)； v_1 = v_A0 + (m_A*dv)/(m_A+m)
+    const vA0 = S.vA;
+    const vA1 = vA0 - (m * dv) / (m_A + m);
+    const v1  = vA0 + (m_A * dv) / (m_A + m);
+    S.vA0 = vA0; S.vA1 = vA1; S.vBall1 = v1;
+    S.vA = vA1; S.vBall = v1;
+    S.ballOwner = null;
+    S.phase = 'aThrow';
+    addArrow(S.xA, S.vA, COLOR_A, vfmt(S.vA), true);
+    addArrow(S.xA, S.vBall, COLOR_BALL, vfmt(S.vBall), false);
+    renderPhases();
+  }
+
+  function catchByB() {
+    // 阶段二：v_B1 = (m_B*v_B0 + m*v_1) / (m_B + m)
+    const vB0 = S.vB;
+    const vB1 = (m_B * vB0 + m * S.vBall) / (m_B + m);
+    S.vB0 = vB0; S.vB1 = vB1;
+    S.vB = vB1; S.vBall = vB1;
+    S.ballOwner = 'B';
+    S.phase = 'bHold';
+    S.holdTimer = HOLD_TIME;
+    addArrow(S.xB, S.vB, COLOR_B, vfmt(S.vB), true);
+    renderPhases();
+  }
+
+  function throwFromB() {
+    // 阶段三：v_B2 = v_B1 + (m*dv)/(m_B+m)； v_2 = v_B1 - (m_B*dv)/(m_B+m)
+    const vB1 = S.vB1;
+    const vB2 = vB1 + (m * dv) / (m_B + m);
+    const v2  = vB1 - (m_B * dv) / (m_B + m);
+    S.vB2 = vB2; S.vBall2 = v2;
+    S.vB = vB2; S.vBall = v2;
+    S.ballOwner = null;
+    S.phase = 'bThrow';
+    addArrow(S.xB, S.vB, COLOR_B, vfmt(S.vB), true);
+    addArrow(S.xB, S.vBall, COLOR_BALL, vfmt(S.vBall), false);
+    renderPhases();
+  }
+
+  function catchByA() {
+    // 补充收尾：v_A2 = (m_A*v_A1 + m*v_2) / (m_A + m)
+    const vA1 = S.vA1;
+    const vA2 = (m_A * vA1 + m * S.vBall) / (m_A + m);
+    S.vA2 = vA2;
+    S.vA = vA2; S.vBall = vA2;
+    S.ballOwner = 'A';
+    S.phase = 'done';
+    S.running = false;
+    addArrow(S.xA, S.vA, COLOR_A, vfmt(S.vA), true);
+    renderPhases();
+    updateButtons();
+  }
+
+  /* ============================================================
+   * 主循环：按时间步长推进物理状态
+   * ============================================================ */
+  function step(dt) {
+    if (!S.running) return;
+    S.t += dt;
+
+    // B 持球等待阶段
+    if (S.phase === 'bHold') {
+      S.holdTimer -= dt;
+      S.xA += S.vA * dt;
+      S.xB += S.vB * dt;
+      S.xBall = S.xB;
+      if (S.holdTimer <= 0) throwFromB();
+      return;
+    }
+
+    // 球在飞行阶段（A->B 或 B->A）
+    if (S.ballOwner === null && (S.phase === 'aThrow' || S.phase === 'bThrow')) {
+      S.xBall += S.vBall * dt;
+      S.xA += S.vA * dt;
+      S.xB += S.vB * dt;
+      if (S.phase === 'aThrow' && S.xBall >= S.xB) { S.xBall = S.xB; catchByB(); }
+      else if (S.phase === 'bThrow' && S.xBall <= S.xA) { S.xBall = S.xA; catchByA(); }
+      return;
+    }
+
+    // 结束：A/B 在冰面上继续匀速滑行
+    if (S.phase === 'done') {
+      S.xA += S.vA * dt;
+      S.xB += S.vB * dt;
+      S.xBall = S.xA;
+    }
+  }
+
+  /* ============================================================
+   * Canvas 绘图
+   * ============================================================ */
+  function drawRink() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#eef6fd');
+    g.addColorStop(1, '#d7e9f7');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 中线（x = 0）
+    ctx.strokeStyle = 'rgba(90, 140, 180, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath(); ctx.moveTo(OX, 0); ctx.lineTo(OX, H); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 滑行轨道线
+    ctx.strokeStyle = 'rgba(90, 140, 180, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, OY); ctx.lineTo(W, OY); ctx.stroke();
+
+    // 米尺刻度
+    ctx.fillStyle = 'rgba(70, 110, 140, 0.55)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let wx = -16; wx <= 16; wx += 2) {
+      const x = toX(wx);
+      const major = (wx % 4 === 0);
+      ctx.strokeStyle = 'rgba(90, 140, 180, 0.28)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, OY - (major ? 9 : 5));
+      ctx.lineTo(x, OY + (major ? 9 : 5));
+      ctx.stroke();
+      if (major) ctx.fillText(wx + 'm', x, OY + 13);
+    }
+  }
+
+  function drawSkater(wx, label, color) {
+    const cx = toX(wx), cy = OY;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    // 字母
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy);
+    // 质量标注
+    ctx.fillStyle = '#3b5270';
+    ctx.font = '12px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label + ' · 70 kg', cx, cy + 27);
+  }
+
+  function drawBall(wx) {
+    const cx = toX(wx), cy = OY;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.fillStyle = COLOR_BALL;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#b5793c';
+    ctx.stroke();
+    // 高光
+    ctx.beginPath();
+    ctx.arc(cx - 3, cy - 4, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fill();
+  }
+
+  function drawArrows() {
+    for (const a of S.arrows) {
+      const alpha = Math.max(0, Math.min(1, a.ttl / 0.6));  // 最后 0.6s 淡出
+      const cx = toX(a.wx);
+      const cy = OY + (a.above ? -52 : 52);
+      const dir = a.vx >= 0 ? 1 : -1;
+      const len = Math.max(28, Math.abs(a.vx) * 14);
+      const x2 = cx + dir * len;
+
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = a.color;
+      ctx.fillStyle = a.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x2, cy); ctx.stroke();
+      // 箭头
+      ctx.beginPath();
+      ctx.moveTo(x2, cy);
+      ctx.lineTo(x2 - dir * 9, cy - 5);
+      ctx.lineTo(x2 - dir * 9, cy + 5);
+      ctx.closePath(); ctx.fill();
+      // 速度数值
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = a.above ? 'bottom' : 'top';
+      ctx.fillText(a.label, (cx + x2) / 2, cy + (a.above ? -6 : 6));
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawHUD() {
+    const name = PHASE_NAMES[S.phase] || '未开始';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.strokeStyle = 'rgba(90, 140, 180, 0.35)';
+    ctx.lineWidth = 1;
+    roundRect(12, 12, 232, 52, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#223a55';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('阶段：' + name, 24, 33);
+    ctx.fillText('时间：' + S.t.toFixed(2) + ' s', 24, 53);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw() {
+    drawRink();
+    drawSkater(S.xA, 'A', COLOR_A);
+    drawSkater(S.xB, 'B', COLOR_B);
+    drawBall(S.xBall);
+    drawArrows();
+    drawHUD();
+
+    if (S.phase === 'idle') {
+      ctx.fillStyle = 'rgba(34, 58, 85, 0.55)';
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('点击下方「开始模拟」播放动画', OX, OY - 130);
+    }
+  }
+
+  /* ============================================================
+   * 公式面板渲染
+   * ============================================================ */
+  function renderPhases() {
+    const cur = currentPhaseId();
+    const list = document.getElementById('phase-list');
+    list.innerHTML = PHASES.map(p => {
+      const status = (cur === p.id) ? 'active' : (p.done() ? 'done' : 'pending');
+      const badge = status === 'active' ? '进行中' : (status === 'done' ? '已完成' : '待进行');
+      return (
+        '<div class="phase-card ' + status + '">' +
+          '<div class="phase-head">' +
+            '<span class="phase-num">' + p.num + '</span>' +
+            '<span class="phase-title">' + p.title + '</span>' +
+            '<span class="phase-badge">' + badge + '</span>' +
+          '</div>' +
+          p.formulas.map(f => '<div class="formula">' + f + '</div>').join('') +
+          '<div class="result">' + p.result() + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function setText(id, text) {
+    document.getElementById(id).textContent = text;
+  }
+
+  function updateLive() {
+    setText('st-time', S.t.toFixed(2) + ' s');
+    setText('st-phase', PHASE_NAMES[S.phase] || '未开始');
+    setText('st-ball', S.ballOwner === null ? '飞行中' : (S.ballOwner + ' 手中'));
+    setText('st-xa', xfmt(S.xA));
+    setText('st-xb', xfmt(S.xB));
+    setText('st-xball', xfmt(S.xBall));
+    setText('st-va', vfmt(S.vA));
+    setText('st-vb', vfmt(S.vB));
+    setText('st-vball', vfmt(S.vBall));
+  }
+
+  /* ============================================================
+   * 重置 / 按钮
+   * ============================================================ */
+  function reset() {
+    S = {
+      running: false, phase: 'idle', t: 0, holdTimer: 0,
+      xA: -5, xB: 5, xBall: -5,          // 初始：A 在 −5，B 在 +5，相距 10 m
+      vA: 0, vB: 0, vBall: 0,
+      ballOwner: 'A',
+      vA0: null, vA1: null, vBall1: null,
+      vB0: null, vB1: null,
+      vB2: null, vBall2: null,
+      vA2: null,
+      arrows: [],
+    };
+    renderPhases();
+    updateLive();
+    draw();
+    updateButtons();
+  }
+
+  function updateButtons() {
+    startBtn.disabled = S.running || S.phase !== 'idle';
+  }
+
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  startBtn.addEventListener('click', () => {
+    if (S.running || S.phase !== 'idle') return;
+    S.running = true;
+    throwFromA();
+    updateButtons();
+  });
+
+  resetBtn.addEventListener('click', reset);
+
+  /* ============================================================
+   * requestAnimationFrame 动画循环（约 60 帧/秒）
+   * ============================================================ */
+  let last = null;
+  function frame(ts) {
+    if (last === null) last = ts;
+    let dt = (ts - last) / 1000;
+    last = ts;
+    dt = Math.min(dt, 0.05);       // 防止切后台后跳帧
+
+    // 箭头淡出用真实时间
+    for (const a of S.arrows) a.ttl -= dt;
+    S.arrows = S.arrows.filter(a => a.ttl > 0);
+
+    step(dt * TIMESCALE);          // 物理用加速后的时间
+    draw();
+    updateLive();
+    requestAnimationFrame(frame);
+  }
+
+  /* ============================================================
+   * 初始化
+   * ============================================================ */
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
